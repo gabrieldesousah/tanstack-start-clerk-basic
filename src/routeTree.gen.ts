@@ -11,6 +11,7 @@
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as AuthedRouteImport } from './routes/_authed'
 import { Route as IndexRouteImport } from './routes/index'
+import { Route as DemoDrizzleRouteImport } from './routes/demo/drizzle'
 import { Route as AuthedPostsRouteImport } from './routes/_authed/posts'
 import { Route as AuthedPostsIndexRouteImport } from './routes/_authed/posts.index'
 import { Route as AuthedProfileSplatRouteImport } from './routes/_authed/profile.$'
@@ -23,6 +24,11 @@ const AuthedRoute = AuthedRouteImport.update({
 const IndexRoute = IndexRouteImport.update({
   id: '/',
   path: '/',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const DemoDrizzleRoute = DemoDrizzleRouteImport.update({
+  id: '/demo/drizzle',
+  path: '/demo/drizzle',
   getParentRoute: () => rootRouteImport,
 } as any)
 const AuthedPostsRoute = AuthedPostsRouteImport.update({
@@ -49,12 +55,14 @@ const AuthedPostsPostIdRoute = AuthedPostsPostIdRouteImport.update({
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/posts': typeof AuthedPostsRouteWithChildren
+  '/demo/drizzle': typeof DemoDrizzleRoute
   '/posts/$postId': typeof AuthedPostsPostIdRoute
   '/profile/$': typeof AuthedProfileSplatRoute
   '/posts/': typeof AuthedPostsIndexRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
+  '/demo/drizzle': typeof DemoDrizzleRoute
   '/posts/$postId': typeof AuthedPostsPostIdRoute
   '/profile/$': typeof AuthedProfileSplatRoute
   '/posts': typeof AuthedPostsIndexRoute
@@ -64,20 +72,28 @@ export interface FileRoutesById {
   '/': typeof IndexRoute
   '/_authed': typeof AuthedRouteWithChildren
   '/_authed/posts': typeof AuthedPostsRouteWithChildren
+  '/demo/drizzle': typeof DemoDrizzleRoute
   '/_authed/posts/$postId': typeof AuthedPostsPostIdRoute
   '/_authed/profile/$': typeof AuthedProfileSplatRoute
   '/_authed/posts/': typeof AuthedPostsIndexRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
-  fullPaths: '/' | '/posts' | '/posts/$postId' | '/profile/$' | '/posts/'
+  fullPaths:
+    | '/'
+    | '/posts'
+    | '/demo/drizzle'
+    | '/posts/$postId'
+    | '/profile/$'
+    | '/posts/'
   fileRoutesByTo: FileRoutesByTo
-  to: '/' | '/posts/$postId' | '/profile/$' | '/posts'
+  to: '/' | '/demo/drizzle' | '/posts/$postId' | '/profile/$' | '/posts'
   id:
     | '__root__'
     | '/'
     | '/_authed'
     | '/_authed/posts'
+    | '/demo/drizzle'
     | '/_authed/posts/$postId'
     | '/_authed/profile/$'
     | '/_authed/posts/'
@@ -86,6 +102,7 @@ export interface FileRouteTypes {
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   AuthedRoute: typeof AuthedRouteWithChildren
+  DemoDrizzleRoute: typeof DemoDrizzleRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -102,6 +119,13 @@ declare module '@tanstack/react-router' {
       path: '/'
       fullPath: '/'
       preLoaderRoute: typeof IndexRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/demo/drizzle': {
+      id: '/demo/drizzle'
+      path: '/demo/drizzle'
+      fullPath: '/demo/drizzle'
+      preLoaderRoute: typeof DemoDrizzleRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/_authed/posts': {
@@ -165,6 +189,7 @@ const AuthedRouteWithChildren =
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   AuthedRoute: AuthedRouteWithChildren,
+  DemoDrizzleRoute: DemoDrizzleRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
