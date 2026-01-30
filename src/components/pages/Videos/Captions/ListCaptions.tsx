@@ -4,7 +4,7 @@ import { CirclePlay } from "lucide-react";
 
 import { Caption } from "/imports/api/captions/collections";
 
-import { cn } from "~/lib/utils";";
+import { cn } from "~/lib/utils";
 import { ScrollArea } from "~/components/ui/scroll-area";
 
 export const ListCaptions = ({

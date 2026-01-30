@@ -1,7 +1,7 @@
 import React from "react";
 import YouTube from "react-youtube";
 
-import { cn } from "~/lib/utils";";
+import { cn } from "~/lib/utils";
 
 type VideoPlayerProps = {
   externalVideoId: string;

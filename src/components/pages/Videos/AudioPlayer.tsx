@@ -2,11 +2,11 @@ import React, { useEffect, useState } from "react";
 
 import { useFind, useSubscribe } from "meteor/react-meteor-data";
 
-import { Pause, Play } from "lucide-react";
+import { Loader2Icon, Pause, Play } from "lucide-react";
 
 import { Video, VideosCollection } from "/imports/api/videos/collections";
 
-import { cn } from "~/lib/utils";";
+import { cn } from "~/lib/utils";
 import { Button } from "~/components/ui/button";
 import { LoaderSpinner } from "~/components/ui/loader";
 
@@ -62,21 +62,31 @@ export const AudioPlayer = ({
     </div>
   ) : (
     <>
-      <Button
-        onClick={() => playVideoAt(start / 1000)}
-        className={cn(
-          "rounded-full w-6 h-6 items-center justify-center p-0",
-          className,
-        )}
-        isLoading={!videoReady}
-      >
-        {isPlaying ? (
-          <Pause className="w-3 h-3" />
-        ) : (
-          <Play className="w-3 h-3" />
-        )}
-      </Button>
-
+      {videoReady ? (
+        <Button
+          onClick={() => playVideoAt(start / 1000)}
+          className={cn(
+            "rounded-full w-6 h-6 items-center justify-center p-0",
+            className,
+          )}
+        >
+          {isPlaying ? (
+            <Pause className="w-3 h-3" />
+          ) : (
+            <Play className="w-3 h-3" />
+          )}
+        </Button>
+      ) : (
+        <Button
+          onClick={() => playVideoAt(start / 1000)}
+          className={cn(
+            "rounded-full w-6 h-6 items-center justify-center p-0",
+            className,
+          )}
+        >
+          <Loader2Icon className="w-3 h-3 animate-spin" />
+        </Button>
+      )}
       <div style={{ display: "none" }}>
         <VideoPlayer
           externalVideoId={video?.externalId || ""}
