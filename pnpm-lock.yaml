@@ -84,6 +84,9 @@ importers:
       '@types/react-dom':
         specifier: ^19.0.3
         version: 19.2.3(@types/react@19.2.10)
+      prettier:
+        specifier: 3.8.1
+        version: 3.8.1
       tailwindcss:
         specifier: ^4.1.18
         version: 4.1.18

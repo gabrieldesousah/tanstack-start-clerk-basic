@@ -20,6 +20,7 @@ import {
 import { DefaultCatchBoundary } from '~/components/DefaultCatchBoundary.js'
 import { NotFound } from '~/components/NotFound.js'
 import appCss from '~/styles/app.css?url'
+import { Toaster } from '~/components/ui/sonner'
 
 const fetchClerkAuth = createServerFn({ method: 'GET' }).handler(async () => {
   const { userId } = await auth()
@@ -86,6 +87,7 @@ function RootComponent() {
     <ClerkProvider>
       <RootDocument>
         <Outlet />
+        <Toaster />
       </RootDocument>
     </ClerkProvider>
   )
