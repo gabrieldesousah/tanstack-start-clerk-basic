@@ -1,53 +1,51 @@
 import * as React from "react";
-import { useSearchParams } from "react-router-dom";
-
-import { Meteor } from "meteor/meteor";
-
-import { Video } from "/imports/api/videos/collections";
+import { useSearch, useNavigate } from "@tanstack/react-router";
 
 import { Button } from "~/components/ui/button";
 import { Input } from "~/components/ui/input";
+import { searchVideos } from "~/utils/videos";
 
 import { VideoCard } from "./Videos/VideoCard";
 
 export const ListVideos = () => {
-  const [searchParams, setSearchParams] = useSearchParams();
-  const searchQuery = searchParams.get("search");
-  const [search, setSearch] = React.useState(searchQuery);
-  const [videos, setVideos] = React.useState<Video[]>([]);
+  const { search: searchQuery } = useSearch({ strict: false });
+  const navigate = useNavigate();
+  const [search, setSearch] = React.useState(searchQuery ?? "");
+  const [videos, setVideos] = React.useState<
+    Awaited<ReturnType<typeof searchVideos>>
+  >([]);
   const [isLoading, setIsLoading] = React.useState(false);
 
   React.useEffect(() => {
     if (searchQuery) {
       setIsLoading(true);
-      Meteor.call(
-        "youtube.search",
-        searchQuery,
-        (error: Error, result: Video[]) => {
-          if (error) {
-            console.error(error);
-          } else {
-            setVideos(result);
-          }
-          setIsLoading(false);
-        },
-      );
-    }
-  }, []);
-
-  const searchVideos = (e: React.FormEvent<HTMLFormElement>) => {
-    e.preventDefault();
-    setIsLoading(true);
-    if (search) {
-      setSearchParams({ search });
-      Meteor.call("youtube.search", search, (error: Error, result: Video[]) => {
-        if (error) {
-          console.error(error);
-        } else {
+      searchVideos({ data: searchQuery })
+        .then((result) => {
           setVideos(result);
-        }
-        setIsLoading(false);
-      });
+        })
+        .catch((error) => {
+          console.error(error);
+        })
+        .finally(() => {
+          setIsLoading(false);
+        });
+    }
+  }, [searchQuery]);
+
+  const handleSearchVideos = async (e: React.FormEvent<HTMLFormElement>) => {
+    e.preventDefault();
+    if (!search) return;
+
+    setIsLoading(true);
+    navigate({ search: { search } });
+
+    try {
+      const result = await searchVideos({ data: search });
+      setVideos(result);
+    } catch (error) {
+      console.error(error);
+    } finally {
+      setIsLoading(false);
     }
   };
 
@@ -55,7 +53,7 @@ export const ListVideos = () => {
     <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 p-5">
       <form
         className="flex w-full gap-x-2 lg:col-span-2"
-        onSubmit={searchVideos}
+        onSubmit={handleSearchVideos}
       >
         <Input
           type="text"
@@ -71,7 +69,7 @@ export const ListVideos = () => {
           Search Videos
         </Button>
       </form>
-      {videos.map((video: Video) => (
+      {videos.map((video) => (
         <VideoCard key={video.externalId} video={video} />
       ))}
     </div>
