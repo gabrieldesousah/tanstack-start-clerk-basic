@@ -1,10 +1,10 @@
-import React, { useEffect, useState } from "react";
+import { useEffect, useState } from "react";
 
-import { useFind, useSubscribe } from "meteor/react-meteor-data";
+import { useQuery } from "@tanstack/react-query";
 
 import { Loader2Icon, Pause, Play } from "lucide-react";
 
-import { Video, VideosCollection } from "/imports/api/videos/collections";
+import { getVideoById } from "~/utils/videos";
 
 import { cn } from "~/lib/utils";
 import { Button } from "~/components/ui/button";
@@ -35,11 +35,11 @@ export const AudioPlayer = ({
     }
   };
 
-  const isLoading = useSubscribe("videos.list");
-  const [video]: Video[] = useFind(
-    () => VideosCollection.find({ _id: videoId }),
-    [videoId],
-  );
+  const { data: video, isLoading } = useQuery({
+    queryKey: ["video", videoId],
+    queryFn: () => getVideoById({ data: videoId }),
+    enabled: !!videoId,
+  });
 
   useEffect(() => {
     const isFinished = () => {
@@ -54,13 +54,17 @@ export const AudioPlayer = ({
     const intervalId = setInterval(isFinished, 300);
 
     return () => clearInterval(intervalId);
-  }, [isPlaying, end, player]);
+  }, [isPlaying, end, player, start]);
 
-  return isLoading() ? (
-    <div className="flex justify-center items-center h-full w-full">
-      <LoaderSpinner />
-    </div>
-  ) : (
+  if (isLoading) {
+    return (
+      <div className="flex justify-center items-center h-full w-full">
+        <LoaderSpinner />
+      </div>
+    );
+  }
+
+  return (
     <>
       {videoReady ? (
         <Button

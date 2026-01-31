@@ -1,6 +1,6 @@
 import { notFound } from "@tanstack/react-router";
 import { createServerFn } from "@tanstack/react-start";
-import { eq, ilike, or } from "drizzle-orm";
+import { asc, eq, ilike, or } from "drizzle-orm";
 import { db } from "~/db";
 import { videos } from "~/db/schema";
 import { z } from "zod";
@@ -51,6 +51,41 @@ const videoSchema = z.object({
   idioms: z.array(z.string()).optional(),
   level: z.enum(["A1", "A2", "B1", "B2", "C1", "C2"]).optional(),
 });
+
+export const getVideos = createServerFn({ method: "GET" })
+  .inputValidator((query?: string) => z.string().optional().parse(query))
+  .handler(async ({ data: query }) => {
+    if (query) {
+      return db
+        .select()
+        .from(videos)
+        .where(
+          or(
+            ilike(videos.name, `%${query}%`),
+            ilike(videos.description, `%${query}%`),
+          ),
+        )
+        .orderBy(asc(videos.createdAt));
+    }
+
+    return db.select().from(videos).orderBy(asc(videos.createdAt));
+  });
+
+export const getVideoById = createServerFn({ method: "GET" })
+  .inputValidator((id: string) => z.string().parse(id))
+  .handler(async ({ data: id }) => {
+    const result = await db
+      .select()
+      .from(videos)
+      .where(eq(videos.id, id))
+      .limit(1);
+
+    if (result.length === 0) {
+      throw notFound();
+    }
+
+    return result[0];
+  });
 
 export const getVideo = createServerFn({ method: "GET" })
   .inputValidator((id: string) => id)
@@ -118,7 +153,7 @@ export const removeVideo = createServerFn({ method: "POST" })
   });
 
 export const searchVideos = createServerFn({ method: "GET" })
-  .validator((query: string) => z.string().min(1).parse(query))
+  .inputValidator((query: string) => z.string().min(1).parse(query))
   .handler(async ({ data: query }) => {
     const result = await db
       .select()

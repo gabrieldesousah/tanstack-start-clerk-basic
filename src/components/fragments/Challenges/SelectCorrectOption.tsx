@@ -1,11 +1,6 @@
 import * as React from "react";
 import { useEffect, useState } from "react";
 
-import { Meteor } from "meteor/meteor";
-
-import { Caption } from "/imports/api/captions/collections";
-import { Dictionary } from "/imports/api/words/collections";
-
 import { WordDialogExplanation } from "~/components/fragments/Words/WordDialogExplanation";
 import { Button } from "~/components/ui/button";
 import {
@@ -16,109 +11,112 @@ import {
   CardTitle,
 } from "~/components/ui/card";
 import { toast } from "sonner";
+import { getRandomWord, findTextWithWord } from "~/utils/words";
+import { createUserLearningWord } from "~/utils/user-learning-words";
+
+type Word = Awaited<ReturnType<typeof getRandomWord>>[number];
+type Caption = Awaited<ReturnType<typeof findTextWithWord>>[number];
 
 export const SelectCorrectOption = ({
   dictionaryWord,
   setCompleted,
 }: {
-  dictionaryWord: Dictionary;
+  dictionaryWord: Word;
   setCompleted: () => void;
 }) => {
   const [allOptions, setAllOptions] = useState<
-    Array<Dictionary & { isCorrect: boolean }>
+    Array<Word & { isCorrect: boolean }>
   >([]);
   const correctOption = { ...dictionaryWord, isCorrect: true };
 
   const [examplesText, setExamplesText] = useState<Caption[]>();
-  useEffect(() => {
-    Meteor.call(
-      "words.random",
-      { notIn: [dictionaryWord._id] },
-      (err: Error, res: Dictionary[]) => {
-        if (err) {
-          console.error(err);
-          return;
-        }
 
-        const incorrectOptions = res.map((word) => ({
+  useEffect(() => {
+    const fetchData = async () => {
+      try {
+        const randomWords = await getRandomWord({
+          data: { notIn: [dictionaryWord.id], limit: 4 },
+        });
+        const incorrectOptions = randomWords.map((word) => ({
           ...word,
           isCorrect: false,
         }));
-
         setAllOptions([correctOption, ...incorrectOptions]);
-      },
-    );
+      } catch (err) {
+        console.error(err);
+      }
 
-    Meteor.call(
-      "words.findInText",
-      dictionaryWord?.en?.text,
-      (err: Error, res: Caption[]) => {
-        if (err) {
+      const enText = (dictionaryWord?.en as { text?: string })?.text;
+      if (enText) {
+        try {
+          const captions = await findTextWithWord({ data: enText });
+          const uniqueExamples = new Set<string>();
+          const filteredExamples = captions.filter((value) => {
+            if (!uniqueExamples.has(value.text)) {
+              uniqueExamples.add(value.text);
+              return true;
+            }
+            return false;
+          });
+          setExamplesText(filteredExamples.slice(0, 3));
+        } catch (err) {
           console.error(err);
-          return;
         }
+      }
+    };
 
-        const uniqueExamples = new Set();
-        const filteredExamples = res.filter((value) => {
-          if (!uniqueExamples.has(value.text)) {
-            uniqueExamples.add(value.text);
-            return true;
-          }
-          return false;
-        });
-        setExamplesText(filteredExamples.slice(0, 3));
-      },
-    );
+    fetchData();
   }, [dictionaryWord]);
 
-  const selectCorrect = () => {
+  const selectCorrect = async () => {
     toast("Correct!");
 
-    // Set to review in 180 days
-    Meteor.call(
-      "user-learning.words.add",
-      {
-        wordId: dictionaryWord._id,
-        nextReviewAt: new Date(Date.now() + 180 * 24 * 60 * 60 * 1000),
-      },
-      (err: Error) => {
-        if (err) {
-          console.error(err);
-        }
+    try {
+      // Set to review in 180 days
+      await createUserLearningWord({
+        data: {
+          wordId: dictionaryWord.id,
+          nextReviewAt: new Date(
+            Date.now() + 180 * 24 * 60 * 60 * 1000,
+          ).toISOString(),
+        },
+      });
+    } catch (err) {
+      console.error(err);
+    }
 
-        setCompleted();
-      },
-    );
+    setCompleted();
   };
 
-  const selectIncorrect = () => {
+  const selectIncorrect = async () => {
     toast("Incorrect!");
 
-    // Set to review now
-    Meteor.call(
-      "user-learning.words.add",
-      {
-        wordId: dictionaryWord._id,
-        nextReviewAt: new Date(),
-      },
-      (err: Error) => {
-        if (err) {
-          console.error(err);
-        }
+    try {
+      // Set to review now
+      await createUserLearningWord({
+        data: {
+          wordId: dictionaryWord.id,
+          nextReviewAt: new Date().toISOString(),
+        },
+      });
+    } catch (err) {
+      console.error(err);
+    }
 
-        setCompleted();
-      },
-    );
+    setCompleted();
   };
+
+  const enContent = dictionaryWord?.en as { text?: string } | undefined;
+
   return (
     <Card className="overflow-hidden w-full lg:w-[600px]">
       <CardHeader>
-        <CardTitle>{dictionaryWord?.en?.text}</CardTitle>
+        <CardTitle>{enContent?.text}</CardTitle>
         <CardDescription>
           {examplesText?.map((caption) => (
             <span
               className="flex flex-wrap gap-x-1 justify-start"
-              key={caption._id}
+              key={caption.id}
             >
               {caption.text
                 .toLocaleLowerCase()
@@ -131,9 +129,7 @@ export const SelectCorrectOption = ({
                       <WordDialogExplanation
                         key={idx}
                         word={word}
-                        className={
-                          word === dictionaryWord?.en?.text ? "font-bold" : ""
-                        }
+                        className={word === enContent?.text ? "font-bold" : ""}
                       />
                     ),
                 )}
@@ -144,15 +140,18 @@ export const SelectCorrectOption = ({
       <CardFooter className="flex flex-wrap justify-center gap-2">
         {allOptions
           .sort(() => Math.random() - 0.5)
-          .map((option) => (
-            <Button
-              className="flex-grow"
-              key={option._id}
-              onClick={option.isCorrect ? selectCorrect : selectIncorrect}
-            >
-              {option.pt?.text}
-            </Button>
-          ))}
+          .map((option) => {
+            const ptContent = option.pt as { text?: string } | undefined;
+            return (
+              <Button
+                className="grow"
+                key={option.id}
+                onClick={option.isCorrect ? selectCorrect : selectIncorrect}
+              >
+                {ptContent?.text}
+              </Button>
+            );
+          })}
       </CardFooter>
     </Card>
   );

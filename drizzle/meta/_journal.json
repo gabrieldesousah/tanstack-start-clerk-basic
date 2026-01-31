@@ -22,6 +22,13 @@
       "when": 1769812206070,
       "tag": "0002_clammy_sheva_callister",
       "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "7",
+      "when": 1769874349668,
+      "tag": "0003_awesome_pride",
+      "breakpoints": true
     }
   ]
 }

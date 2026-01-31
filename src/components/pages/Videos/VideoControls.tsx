@@ -67,7 +67,7 @@ export function VideoControls({
             captions={captions}
             currentCaptionIndex={currentCaptionIndex}
             playVideoAt={playVideoAt}
-            className="flex-grow overflow-auto"
+            className="grow overflow-auto"
           />
         </DrawerContent>
       </Drawer>

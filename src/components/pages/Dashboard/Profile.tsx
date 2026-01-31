@@ -1,12 +1,9 @@
-import * as React from "react";
-import { FormEvent } from "react";
+import { SyntheticEvent, useEffect, useState } from "react";
 
-import { useLoggedUser } from "meteor/quave:logged-user-react";
-import { useSubscribe } from "meteor/react-meteor-data";
+import { useUser } from "@clerk/tanstack-start";
 
 import { PlusCircle } from "lucide-react";
-
-import { useMethodCaller } from "/imports/ui/utils";
+import { toast } from "sonner";
 
 import { Button } from "~/components/ui/button";
 import {
@@ -28,67 +25,82 @@ import { Label } from "~/components/ui/label";
 import { LoaderSpinner } from "~/components/ui/loader";
 
 export function Profile() {
-  const isLoadingProfile = useSubscribe("user.profile");
-  const { loggedUser, isLoadingLoggedUser } = useLoggedUser();
+  const { user, isLoaded } = useUser();
 
-  const [name, setName] = React.useState("");
+  const [name, setName] = useState("");
+  const [isUpdating, setIsUpdating] = useState(false);
 
-  React.useEffect(() => {
-    if (!name && loggedUser?.profile?.name) {
-      setName(loggedUser.profile?.name);
+  useEffect(() => {
+    if (!name && user?.firstName) {
+      setName(user.firstName + (user.lastName ? ` ${user.lastName}` : ""));
     }
-  }, [loggedUser]);
+  }, [user]);
 
-  const { callMethod } = useMethodCaller();
+  const handleProfileUpdate = async () => {
+    if (!user) return;
 
-  const handleProfileUpdate = () => {
-    callMethod(
-      "users.updateProfile",
-      {
-        pending: () => "Saving settings...",
-        success: () => "Settings updated successfully",
-        error: () => "Error updating settings",
-      },
-      {
-        name,
-      },
-    ).finally(() => {});
+    setIsUpdating(true);
+    const toastId = toast.loading("Saving settings...");
+
+    try {
+      const nameParts = name.trim().split(" ");
+      const firstName = nameParts[0] || "";
+      const lastName = nameParts.slice(1).join(" ") || "";
+
+      await user.update({
+        firstName,
+        lastName,
+      });
+
+      toast.success("Settings updated successfully", { id: toastId });
+    } catch (error) {
+      toast.error("Error updating settings", { id: toastId });
+      console.error(error);
+    } finally {
+      setIsUpdating(false);
+    }
   };
 
-  const [isAddEmailDialogOpen, setIsAddEmailDialogOpen] = React.useState(false);
-  const [newEmail, setNewEmail] = React.useState("");
+  const [isAddEmailDialogOpen, setIsAddEmailDialogOpen] = useState(false);
+  const [newEmail, setNewEmail] = useState("");
 
-  const handleAddEmail = (e: FormEvent<HTMLFormElement>) => {
+  const handleAddEmail = async (e: SyntheticEvent<HTMLFormElement>) => {
     e.preventDefault();
+    if (!user) return;
 
-    callMethod(
-      "users.addEmail",
-      {
-        pending: () => "Adding email...",
-        success: () => "Email added successfully",
-        error: () => "Error adding email",
-      },
-      {
-        email: newEmail,
-      },
-    ).finally(() => setIsAddEmailDialogOpen(false));
+    const toastId = toast.loading("Adding email...");
+
+    try {
+      await user.createEmailAddress({ email: newEmail });
+      toast.success("Email added successfully. Please verify it.", {
+        id: toastId,
+      });
+      setNewEmail("");
+      setIsAddEmailDialogOpen(false);
+    } catch (error) {
+      toast.error("Error adding email", { id: toastId });
+      console.error(error);
+    }
   };
 
-  const handleRemoveEmail = (email: string) => {
-    callMethod(
-      "users.removeEmail",
-      {
-        pending: () => "Removing email...",
-        success: () => "Email removed successfully",
-        error: () => "Error removing email",
-      },
-      {
-        email,
-      },
-    ).finally(() => {});
+  const handleRemoveEmail = async (emailId: string) => {
+    if (!user) return;
+
+    const toastId = toast.loading("Removing email...");
+
+    try {
+      const emailAddress = user.emailAddresses.find((e) => e.id === emailId);
+      if (emailAddress) {
+        await emailAddress.destroy();
+        toast.success("Email removed successfully", { id: toastId });
+      }
+    } catch (error) {
+      toast.error("Error removing email", { id: toastId });
+      console.error(error);
+    }
   };
 
-  const isLoading = isLoadingProfile() || isLoadingLoggedUser;
+  const isLoading = !isLoaded;
 
   return isLoading ? (
     <LoaderSpinner />
@@ -110,26 +122,26 @@ export function Profile() {
 
         <div className="space-y-2">
           <Label htmlFor="email">Emails</Label>
-          {loggedUser?.emails.map((email) => (
-            <span key={email.address} className="flex items-center">
+          {user?.emailAddresses.map((email) => (
+            <span key={email.id} className="flex items-center">
               <Input
-                id={email._id}
+                id={email.id}
                 type="email"
-                value={email.address}
+                value={email.emailAddress}
                 className="ml-4 w-80"
                 disabled
               />
-              {loggedUser?.emails.length > 1 && (
+              {user.emailAddresses.length > 1 && (
                 <button
                   className="h-10 p-2 flex items-center"
-                  onClick={() => handleRemoveEmail(email.address)}
+                  onClick={() => handleRemoveEmail(email.id)}
                 >
                   <PlusCircle className="transform rotate-45" />
                 </button>
               )}
             </span>
           ))}
-          {loggedUser?.emails.length < 5 && (
+          {(user?.emailAddresses.length ?? 0) < 5 && (
             <Button
               variant={"ghost"}
               className="ml-4 h-10 p-2 flex items-center gap-2"
@@ -168,7 +180,9 @@ export function Profile() {
         </div>
       </CardContent>
       <CardFooter className={"justify-end"}>
-        <Button onClick={handleProfileUpdate}>Update Profile</Button>
+        <Button onClick={handleProfileUpdate} disabled={isUpdating}>
+          Update Profile
+        </Button>
       </CardFooter>
     </Card>
   );

@@ -1,32 +1,28 @@
-import React, { useState } from "react";
+import { useState } from "react";
 
-import { useFind, useSubscribe } from "meteor/react-meteor-data";
+import { useQuery } from "@tanstack/react-query";
 
-import { DictionaryCollection } from "/imports/api/words/collections";
+import { getUnlearnedWords } from "~/utils/user-learning-words";
 
-import { SelectCorrectOption } from "~/components/Challenges/SelectCorrectOption";
-import { WordCard } from "~/components/Words/WordCard";
+import { SelectCorrectOption } from "~/components/fragments/Challenges/SelectCorrectOption";
+import { WordCard } from "~/components/fragments/Words/WordCard";
 import { LoaderSpinner } from "~/components/ui/loader";
 
-/**
- * Get words that isn't in user-dictionary but in the same user level
- */
 export const DiscoveryWords = () => {
   const [index, setIndex] = useState(0);
 
-  const isLoading = useSubscribe("unlearnedWords");
-
-  const unlearnedWords = useFind(() => DictionaryCollection.find({}));
-
-  console.log("unlearnedWords", unlearnedWords);
+  const { data: unlearnedWords, isLoading } = useQuery({
+    queryKey: ["unlearned-words"],
+    queryFn: () => getUnlearnedWords(),
+  });
 
   return (
-    <div className="flex flex-col flex-grow h-full p-5">
-      {isLoading() ? (
+    <div className="flex flex-col grow h-full p-5">
+      {isLoading ? (
         <div className="flex justify-center items-center h-full w-full">
           <LoaderSpinner />
         </div>
-      ) : unlearnedWords.length === 0 ? (
+      ) : !unlearnedWords || unlearnedWords.length === 0 ? (
         <WordCard>No words to review</WordCard>
       ) : (
         <>

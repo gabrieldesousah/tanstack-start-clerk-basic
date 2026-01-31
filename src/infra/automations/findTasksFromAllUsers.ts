@@ -1,63 +1,83 @@
-import { Meteor } from 'meteor/meteor';
+import { eq, ne, lte, notInArray, sql } from "drizzle-orm";
 
-import { getReviewWordsCursor } from '/imports/api/user-learning/words/publications';
-import { Dictionary } from '/imports/api/words/collections';
-import { getRandomWord } from '/imports/api/words/methods';
+import { db } from "~/db";
+import { userProfiles, userLearningWords, words } from "~/db/schema";
 
-import { sendInteractiveMessage } from '/imports/infra/messaging/WhatsApp/sendInteractiveMessage';
+import { sendInteractiveMessage } from "~/infra/messaging/WhatsApp/sendInteractiveMessage";
 
-export const findTasksFromAllUsers = async (limit = 100, skip = 0) => {
-	const activeUsers = await Meteor.users
-		.find({ active: { $ne: false } })
-		.fetchAsync();
+type Word = typeof words.$inferSelect;
 
-	await Promise.all(
-		activeUsers.map(async (user) => {
-			const whatsappPhone = user.services.whatsapp.uid;
-			if (!whatsappPhone) return;
+export const findTasksFromAllUsers = async (limit = 10) => {
+  // Get active users with WhatsApp phone
+  const activeUsers = await db
+    .select()
+    .from(userProfiles)
+    .where(ne(userProfiles.active, "false"));
 
-			const reviewWordsCursor = await getReviewWordsCursor({
-				userId: user._id,
-				limit,
-				skip,
-			});
-			const reviewWords = await reviewWordsCursor.fetchAsync();
+  await Promise.all(
+    activeUsers.map(async (user) => {
+      const whatsappPhone = user.whatsappPhone;
+      if (!whatsappPhone) return;
 
-			const firstWord = reviewWords.pop();
-			if (!reviewWords.length || !firstWord || !firstWord._id) {
-				return;
-			}
+      // Get words due for review (nextReviewAt <= now)
+      const reviewWordsResult = await db
+        .select({
+          learningWord: userLearningWords,
+          word: words,
+        })
+        .from(userLearningWords)
+        .innerJoin(words, eq(userLearningWords.wordId, words.id))
+        .where(eq(userLearningWords.userId, user.clerkUserId))
+        .where(lte(userLearningWords.nextReviewAt, new Date()))
+        .orderBy(userLearningWords.nextReviewAt)
+        .limit(limit);
 
-			const wrongRandomWords = await getRandomWord({
-				notIn: [firstWord._id],
-				limit: 2,
-			});
+      const firstResult = reviewWordsResult.pop();
+      if (!reviewWordsResult.length || !firstResult || !firstResult.word.id) {
+        return;
+      }
 
-			const buttons = wrongRandomWords.map((word: Dictionary) => ({
-				type: 'reply',
-				reply: { id: `QA#wrong#${word._id}`, title: word?.pt?.text },
-			}));
-			buttons.push({
-				type: 'reply',
-				reply: {
-					id: `QA#correct#${firstWord?._id}`,
-					title: firstWord?.pt?.text,
-				},
-			});
+      const firstWord = firstResult.word;
 
-			await sendInteractiveMessage({
-				type: 'button',
-				text: `🔍 Word Review Time! 🔍
+      // Get random wrong words
+      const wrongRandomWords = await db
+        .select()
+        .from(words)
+        .where(notInArray(words.id, [firstWord.id]))
+        .orderBy(sql`RANDOM()`)
+        .limit(2);
+
+      const enContent = firstWord.en as { text?: string } | undefined;
+      const ptContent = firstWord.pt as { text?: string } | undefined;
+
+      const buttons = wrongRandomWords.map((word: Word) => {
+        const wordPt = word.pt as { text?: string } | undefined;
+        return {
+          type: "reply" as const,
+          reply: { id: `QA#wrong#${word.id}`, title: wordPt?.text || "" },
+        };
+      });
+      buttons.push({
+        type: "reply" as const,
+        reply: {
+          id: `QA#correct#${firstWord.id}`,
+          title: ptContent?.text || "",
+        },
+      });
+
+      await sendInteractiveMessage({
+        type: "button",
+        text: `🔍 Word Review Time! 🔍
 
 Remember this word?
 
-🌟 *${firstWord?.en?.text}*
+🌟 *${enContent?.text}*
 
 Did you get that right? Check your understanding:
 👇 Tap the correct translation! 👇`,
-				phone: whatsappPhone,
-				buttons: buttons.sort(() => Math.random() - 0.5),
-			});
-		}),
-	);
+        phone: whatsappPhone,
+        buttons: buttons.sort(() => Math.random() - 0.5),
+      });
+    }),
+  );
 };

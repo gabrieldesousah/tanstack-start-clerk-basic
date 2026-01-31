@@ -21,14 +21,10 @@ import { DefaultCatchBoundary } from "~/components/DefaultCatchBoundary.js";
 import { NotFound } from "~/components/NotFound.js";
 import appCss from "~/styles/app.css?url";
 import { Toaster } from "~/components/ui/sonner";
-
-const fetchClerkAuth = createServerFn({ method: "GET" }).handler(async () => {
-  const { userId } = await auth();
-
-  return {
-    userId,
-  };
-});
+import { QueryClientProvider } from "@tanstack/react-query";
+import { ReactQueryDevtools } from "@tanstack/react-query-devtools";
+import { queryClient } from "config/queryClient";
+import { fetchClerkAuth } from "~/infra/auth/checkAuth";
 
 export const Route = createRootRoute({
   beforeLoad: async () => {
@@ -86,8 +82,14 @@ function RootComponent() {
   return (
     <ClerkProvider>
       <RootDocument>
-        <Outlet />
-        <Toaster />
+        <QueryClientProvider client={queryClient}>
+          <ReactQueryDevtools
+            initialIsOpen={false}
+            buttonPosition="bottom-right"
+          />
+          <Outlet />
+          <Toaster />
+        </QueryClientProvider>
       </RootDocument>
     </ClerkProvider>
   );

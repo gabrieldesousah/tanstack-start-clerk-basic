@@ -1,10 +1,5 @@
 # Project
 
-## Environment
-
-- Copy private/env/example/settings.json to private/env/dev/settings.json
-- Run `meteo npm install` and then `meteor npm run start`
-
 # Todo
 
 - [x] Bloquear videos sem legenda

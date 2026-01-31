@@ -1,28 +1,26 @@
-import { SyncedCron } from 'meteor/quave:synced-cron';
+import cron from "node-cron";
 
-import { discoveryWordsFromAllUsers } from '/imports/infra/automations/discoveryWordsFromAllUsers';
-import { findTasksFromAllUsers } from '/imports/infra/automations/findTasksFromAllUsers';
+import { discoveryWordsFromAllUsers } from "~/infra/automations/discoveryWordsFromAllUsers";
+import { findTasksFromAllUsers } from "~/infra/automations/findTasksFromAllUsers";
 
-SyncedCron.add({
-	name: 'Find for tasks from all users',
-	schedule: function (parser: any) {
-		return parser.text('every 6 hours');
-		// return parser.cron('0 0 8,12,19 * * *');
-	},
-	job: async function () {
-		await findTasksFromAllUsers();
-	},
+// Run every 6 hours (at minute 0)
+cron.schedule("0 */6 * * *", async () => {
+  console.log("Running: Find tasks from all users");
+  try {
+    await findTasksFromAllUsers();
+  } catch (error) {
+    console.error("Error in findTasksFromAllUsers cron:", error);
+  }
 });
 
-SyncedCron.add({
-	name: 'Discovery words for all users',
-	schedule: function (parser: any) {
-		return parser.text('every 4 hours');
-		// return parser.cron('0 0 8,12,19 * * *');
-	},
-	job: async function () {
-		await discoveryWordsFromAllUsers();
-	},
+// Run every 4 hours (at minute 0)
+cron.schedule("0 */4 * * *", async () => {
+  console.log("Running: Discovery words for all users");
+  try {
+    await discoveryWordsFromAllUsers();
+  } catch (error) {
+    console.error("Error in discoveryWordsFromAllUsers cron:", error);
+  }
 });
 
-SyncedCron.start();
+console.log("Cron jobs scheduled");

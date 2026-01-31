@@ -1,62 +1,79 @@
-import { Meteor } from 'meteor/meteor';
+import { eq, ne, notInArray, sql } from "drizzle-orm";
 
-import { Dictionary } from '/imports/api/words/collections';
-import { getRandomWord } from '/imports/api/words/methods';
-import { getUnlearnedWordsCursor } from '/imports/api/words/publications';
+import { db } from "~/db";
+import { userProfiles, userLearningWords, words } from "~/db/schema";
 
-import { sendInteractiveMessage } from '/imports/infra/messaging/WhatsApp/sendInteractiveMessage';
+import { sendInteractiveMessage } from "~/infra/messaging/WhatsApp/sendInteractiveMessage";
 
-export const discoveryWordsFromAllUsers = async (limit = 100, skip = 0) => {
-	const activeUsers = await Meteor.users
-		.find({ active: { $ne: false } })
-		.fetchAsync();
+type Word = typeof words.$inferSelect;
 
-	await Promise.all(
-		activeUsers.map(async (user) => {
-			const whatsappPhone = user.services.whatsapp.uid;
-			if (!whatsappPhone) return;
-			console.log('whatsappPhone', whatsappPhone);
+export const discoveryWordsFromAllUsers = async (limit = 10) => {
+  // Get active users with WhatsApp phone
+  const activeUsers = await db
+    .select()
+    .from(userProfiles)
+    .where(ne(userProfiles.active, "false"));
 
-			const discoveryWordsCursor = await getUnlearnedWordsCursor({
-				userId: user._id,
-				level: user.profile?.languages?.en.level,
-				limit,
-				skip,
-			});
-			const discoveryWords = await discoveryWordsCursor.fetchAsync();
+  await Promise.all(
+    activeUsers.map(async (user) => {
+      const whatsappPhone = user.whatsappPhone;
+      if (!whatsappPhone) return;
+      console.log("whatsappPhone", whatsappPhone);
 
-			const firstWord = discoveryWords.pop();
-			if (!discoveryWords.length || !firstWord || !firstWord._id) {
-				return;
-			}
+      // Get words not yet learned by this user
+      const userWordIds = db
+        .select({ wordId: userLearningWords.wordId })
+        .from(userLearningWords)
+        .where(eq(userLearningWords.userId, user.clerkUserId));
 
-			const wrongRandomWords = await getRandomWord({
-				notIn: [firstWord._id],
-				limit: 2,
-			});
+      const discoveryWords = await db
+        .select()
+        .from(words)
+        .where(notInArray(words.id, userWordIds))
+        .orderBy(sql`RANDOM()`)
+        .limit(limit);
 
-			const buttons = wrongRandomWords.map((word: Dictionary) => ({
-				type: 'reply',
-				reply: { id: `QA#wrong#${word._id}`, title: word?.pt?.text },
-			}));
-			buttons.push({
-				type: 'reply',
-				reply: {
-					id: `QA#correct#${firstWord?._id}`,
-					title: firstWord?.pt?.text,
-				},
-			});
+      const firstWord = discoveryWords.pop();
+      if (!discoveryWords.length || !firstWord || !firstWord.id) {
+        return;
+      }
 
-			await sendInteractiveMessage({
-				type: 'button',
-				text: `📝 New Vocabulary! 📝
+      // Get random wrong words
+      const wrongRandomWords = await db
+        .select()
+        .from(words)
+        .where(notInArray(words.id, [firstWord.id]))
+        .orderBy(sql`RANDOM()`)
+        .limit(2);
 
-🌟 *${firstWord?.en?.text}*
+      const enContent = firstWord.en as { text?: string } | undefined;
+      const ptContent = firstWord.pt as { text?: string } | undefined;
+
+      const buttons = wrongRandomWords.map((word: Word) => {
+        const wordPt = word.pt as { text?: string } | undefined;
+        return {
+          type: "reply" as const,
+          reply: { id: `QA#wrong#${word.id}`, title: wordPt?.text || "" },
+        };
+      });
+      buttons.push({
+        type: "reply" as const,
+        reply: {
+          id: `QA#correct#${firstWord.id}`,
+          title: ptContent?.text || "",
+        },
+      });
+
+      await sendInteractiveMessage({
+        type: "button",
+        text: `📝 New Vocabulary! 📝
+
+🌟 *${enContent?.text}*
 
 👇 What's the correct meaning? 👇`,
-				phone: whatsappPhone,
-				buttons: buttons.sort(() => Math.random() - 0.5),
-			});
-		}),
-	);
+        phone: whatsappPhone,
+        buttons: buttons.sort(() => Math.random() - 0.5),
+      });
+    }),
+  );
 };

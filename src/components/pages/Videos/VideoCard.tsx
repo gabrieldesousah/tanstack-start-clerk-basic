@@ -1,13 +1,11 @@
-import React, { useState } from "react";
-import { useNavigate } from "react-router-dom";
-
-import { Meteor } from "meteor/meteor";
+import { useState } from "react";
+import { useNavigate } from "@tanstack/react-router";
 
 import { Loader2 } from "lucide-react";
 
-import { Video } from "/imports/api/videos/collections";
-
 import { toast } from "sonner";
+
+import { createVideo } from "~/utils/videos";
 
 import { Button } from "~/components/ui/button";
 import {
@@ -30,47 +28,105 @@ import {
 import { getDurationFormatted } from "~/lib/videos";
 import { VideoPlayer } from "./VideoPlayer";
 
+type Thumbnail = {
+  url: string;
+  width: number;
+  height: number;
+};
+
+type Channel = {
+  _id?: string;
+  externalId: string;
+  name: string;
+  thumbnails: any;
+};
+
+type Video = {
+  id?: string;
+  name: string;
+  externalId: string;
+  description: string;
+  thumbnails: Thumbnail[] | Record<string, Thumbnail>;
+  publishedAt?: Date | string | null;
+  duration: number;
+  viewCount: string;
+  tags?: string[] | null;
+  channel?: Channel | null;
+  phrasalVerbs?: string[] | null;
+  idioms?: string[] | null;
+  level?: string | null;
+};
+
 export const VideoCard = ({ video }: { video: Video }) => {
   const [isLoading, setIsLoading] = useState(false);
   const navigate = useNavigate();
 
-  const handleSaveOrOpenVideo = () => {
+  const handleSaveOrOpenVideo = async () => {
     setIsLoading(true);
     toast("Salvando vídeo", {
       description: video.name,
     });
-    Meteor.call(
-      "youtube.getVideo",
-      { externalVideoId: video.externalId },
-      (error: Error, result: Video) => {
-        setIsLoading(false);
 
-        if (error || !result) {
-          toast("Erro ao salvar o vídeo", {
-            description: error?.message,
-          });
-          console.error(error);
-          return;
-        }
+    try {
+      const thumbnailsArray = Array.isArray(video.thumbnails)
+        ? video.thumbnails
+        : Object.values(video.thumbnails);
 
-        toast("Opening...", {
-          duration: 1000,
-        });
-        navigate(`/player/${result._id}`);
-      },
-    );
+      const result = await createVideo({
+        data: {
+          name: video.name,
+          externalId: video.externalId,
+          description: video.description,
+          thumbnails: thumbnailsArray,
+          publishedAt: video.publishedAt
+            ? new Date(video.publishedAt)
+            : undefined,
+          duration: video.duration,
+          viewCount: video.viewCount,
+          tags: video.tags ?? undefined,
+          channel: video.channel ?? undefined,
+          phrasalVerbs: video.phrasalVerbs ?? undefined,
+          idioms: video.idioms ?? undefined,
+          level: video.level as
+            | "A1"
+            | "A2"
+            | "B1"
+            | "B2"
+            | "C1"
+            | "C2"
+            | undefined,
+        },
+      });
+
+      toast("Opening...", {
+        duration: 1000,
+      });
+      navigate({ to: "/player/$videoId", params: { videoId: result.id } });
+    } catch (error) {
+      toast("Erro ao salvar o vídeo", {
+        description: error instanceof Error ? error.message : "Unknown error",
+      });
+      console.error(error);
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   const openVideo = () => {
-    if (!video._id) {
+    if (!video.id) {
       return;
     }
 
-    navigate(`/player/${video._id}`);
+    navigate({ to: "/player/$videoId", params: { videoId: video.id } });
   };
 
-  const highestResolutionThumbnail = Object.values(video?.thumbnails).reduce(
+  const thumbnailsArray = Array.isArray(video?.thumbnails)
+    ? video.thumbnails
+    : Object.values(video?.thumbnails || {});
+
+  const highestResolutionThumbnail = thumbnailsArray.reduce(
     (max, current) => (max.width > current.width ? max : current),
+    thumbnailsArray[0],
   );
 
   return (
@@ -79,7 +135,7 @@ export const VideoCard = ({ video }: { video: Video }) => {
       className="w-full flex items-center overflow-hidden relative p-0"
     >
       <div className="flex opacity-0 hover:opacity-100 absolute top-0 left-0 w-full h-full bg-black/50 items-center justify-center z-10 cursor-pointer">
-        {video._id ? (
+        {video.id ? (
           <Button variant="secondary" onClick={openVideo}>
             Estudar conteúdo!
           </Button>
@@ -129,7 +185,7 @@ export const VideoCard = ({ video }: { video: Video }) => {
       <CardContent className="absolute bottom-0 p-5 bg-primary/80 text-white justify-between w-full flex-auto h-48">
         <CardTitle className="text-left">{video.name}</CardTitle>
         <CardDescription className="justify-center lg:justify-between text-left flex flex-col  text-white">
-          <span>{video.channel?.name}</span>
+          <span>{(video.channel as Channel | undefined)?.name}</span>
           <span>{getDurationFormatted(video.duration)}</span>
           <span>
             {video?.publishedAt instanceof Date

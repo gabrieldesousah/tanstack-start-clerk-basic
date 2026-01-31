@@ -1,17 +1,5 @@
 import React from "react";
 
-import { Meteor } from "meteor/meteor";
-import { useFind, useSubscribe } from "meteor/react-meteor-data";
-
-import {
-  type Caption,
-  CaptionsCollection,
-} from "/imports/api/captions/collections";
-import {
-  type Dictionary,
-  availableLanguages,
-} from "/imports/api/words/collections";
-
 import { toast } from "sonner";
 
 import { Button } from "~/components/ui/button";
@@ -20,6 +8,13 @@ import { WordMeaningAndAlternative } from "./WordMeaningAndAlternative";
 import { LoaderSpinner } from "~/components/ui/loader";
 import { Loader2Icon } from "lucide-react";
 import { AudioPlayer } from "~/components/pages/Videos/AudioPlayer";
+import { createExplanation, findTextWithWord } from "~/utils/words";
+import { createUserLearningWord } from "~/utils/user-learning-words";
+
+type Dictionary = Awaited<ReturnType<typeof createExplanation>>;
+type Caption = Awaited<ReturnType<typeof findTextWithWord>>[number];
+
+const availableLanguages = ["en", "pt"] as const;
 
 export const WordDialogContent = ({
   word,
@@ -29,58 +24,54 @@ export const WordDialogContent = ({
   canSave?: boolean;
 }) => {
   const [dictionary, setDictionary] = React.useState<Dictionary>();
+  const [captions, setCaptions] = React.useState<Caption[]>([]);
   const [isLoadingDictionary, setIsLoadingDictionary] = React.useState(false);
+  const [isLoadingPhrases, setIsLoadingPhrases] = React.useState(false);
 
-  const isLoadingPhrases = useSubscribe("captions.findByWord", { word });
-  const captions = useFind(() =>
-    CaptionsCollection.find(
-      {
-        text: { $regex: word },
-      },
-      { limit: 10 },
-    ),
-  );
-
-  const isLoading = isLoadingPhrases() || isLoadingDictionary;
-
-  const fetchDictionary = () => {
-    setIsLoadingDictionary(true);
-
-    Meteor.call(
-      "words.explanation",
-      word,
-      (error: Error, result: Dictionary) => {
-        setIsLoadingDictionary(false);
-
-        if (error || !result) {
-          console.error(error);
-          return;
-        }
-        setDictionary(result);
-      },
-    );
-  };
+  const isLoading = isLoadingPhrases || isLoadingDictionary;
 
   React.useEffect(() => {
-    fetchDictionary();
+    const fetchData = async () => {
+      setIsLoadingDictionary(true);
+      setIsLoadingPhrases(true);
+
+      try {
+        const result = await createExplanation({ data: word });
+        setDictionary(result);
+      } catch (error) {
+        console.error(error);
+      } finally {
+        setIsLoadingDictionary(false);
+      }
+
+      try {
+        const captionsResult = await findTextWithWord({ data: word });
+        setCaptions(captionsResult);
+      } catch (error) {
+        console.error(error);
+      } finally {
+        setIsLoadingPhrases(false);
+      }
+    };
+
+    fetchData();
   }, [word]);
 
-  const handleSaveWord = () => {
-    Meteor.call(
-      "user-learning.words.add",
-      { wordId: dictionary?._id },
-      (error: Error) => {
-        if (error) {
-          toast("Error saving word", {
-            description: error.message,
-          });
-        } else {
-          toast("Word saved successfully", {
-            description: "You can now study this word",
-          });
-        }
-      },
-    );
+  const handleSaveWord = async () => {
+    if (!dictionary?.id) return;
+
+    try {
+      await createUserLearningWord({
+        data: { wordId: dictionary.id },
+      });
+      toast("Word saved successfully", {
+        description: "You can now study this word",
+      });
+    } catch (error) {
+      toast("Error saving word", {
+        description: error instanceof Error ? error.message : "Unknown error",
+      });
+    }
   };
 
   return (
@@ -112,8 +103,8 @@ export const WordDialogContent = ({
                         index ===
                         self.findIndex((c) => c.text === caption.text),
                     )
-                    .map((caption: Caption) => (
-                      <li key={caption._id}>
+                    .map((caption) => (
+                      <li key={caption.id}>
                         {caption.text
                           .replace(/[.,\/#!$%\^&\*;:{}=_`~()]/g, "")
                           .split(" ")
@@ -141,16 +132,16 @@ export const WordDialogContent = ({
 
       {canSave && (
         <div className="flex justify-end">
-          isLoading ? (
-          <Button variant="secondary" disabled>
-            Downloading
-            <Loader2Icon data-icon="inline-start" />
-          </Button>
+          {isLoading ? (
+            <Button variant="secondary" disabled>
+              Downloading
+              <Loader2Icon data-icon="inline-start" />
+            </Button>
           ) : (
-          <Button type="button" variant="secondary" onClick={handleSaveWord}>
-            Save to learn
-          </Button>
-          )
+            <Button type="button" variant="secondary" onClick={handleSaveWord}>
+              Save to learn
+            </Button>
+          )}
         </div>
       )}
     </>

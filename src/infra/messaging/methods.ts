@@ -1,121 +1,114 @@
-import { Meteor } from 'meteor/meteor';
-import { ContactMessage, Message, WebhookMessage } from 'whatsapp-business';
+import { ContactMessage, Message, WebhookMessage } from "whatsapp-business";
 
-import { MessagesCollection } from '/imports/infra/messaging/collections';
+import { createMessage, type NewMessage } from "~/infra/messaging/collections";
 import {
-	Components,
-	Context,
-	Interactive,
-	MessageDTO,
-} from '/imports/infra/messaging/message-dto';
+  Components,
+  Context,
+  Interactive,
+} from "~/infra/messaging/message-dto";
 
-export async function getComponents(message: WebhookMessage | Message) {
-	const components: Components = {};
+export async function getComponents(
+  message: WebhookMessage | Message,
+): Promise<Components> {
+  const components: Components = {};
 
-	if (message.text) {
-		components.body = { text: message.text.body };
-	}
+  if (message.text) {
+    components.body = { text: message.text.body };
+  }
 
-	if (message.image || message.sticker) {
-		/**
-		 * This is the content for image:
-		 *  "image": {
-		 *     "caption": "This is a caption",
-		 *     "mime_type": "image/jpeg",
-		 *     "sha256": "81d3bd8a8db4868c9520ed47186e8b7c5789e61ff79f7f834be6950b808a90d3",
-		 *     "id": "2754859441498128"
-		 * 	}
-		 * 	It don't have a URL, so we need to get the image from the API and just then save it
-		 */
-		// components.attachments =
-	}
+  if (message.image || message.sticker) {
+    // Image content handling would go here
+    // Note: WhatsApp API returns image ID, need to fetch URL separately
+  }
 
-	if (message.interactive?.body) {
-		components.body = message.interactive.body;
-	}
+  if (message.interactive?.body) {
+    components.body = message.interactive.body;
+  }
 
-	if (message?.contacts) {
-		components.attachments = message.contacts.map((contact: ContactMessage) => {
-			return {
-				type: 'contacts',
-				contact: contact,
-			};
-		});
-	}
+  if (message?.contacts) {
+    components.attachments = message.contacts.map((contact: ContactMessage) => {
+      return {
+        type: "contacts" as const,
+        contact: contact,
+      };
+    });
+  }
 
-	return components;
+  return components;
 }
 
-export async function getContext(message: WebhookMessage | Message) {
-	const context = {};
+export async function getContext(
+  message: WebhookMessage | Message,
+): Promise<Context | undefined> {
+  const context: Partial<Context> = {};
 
-	if (message?.referral) {
-		context.type = 'post';
-		context.referral = message?.referral;
-	}
+  if (message?.referral) {
+    context.type = "post";
+    context.referral = message?.referral;
+  }
 
-	if (!Object.values(context).length) return;
+  if (!Object.values(context).length) return;
 
-	return context as Context;
+  return context as Context;
 }
 
-export async function getInteractive(message: WebhookMessage | Message) {
-	const interactive: any = [];
+export async function getInteractive(
+  message: WebhookMessage | Message,
+): Promise<Interactive[] | undefined> {
+  const interactive: Interactive[] = [];
 
-	if (
-		message?.interactive &&
-		'type' in message.interactive &&
-		'action' in message.interactive
-	) {
-		interactive[0] = {
-			type: message.interactive.type,
-			action: message.interactive.action,
-		};
-	}
+  if (
+    message?.interactive &&
+    "type" in message.interactive &&
+    "action" in message.interactive
+  ) {
+    interactive[0] = {
+      type: message.interactive.type,
+      action: message.interactive.action,
+    };
+  }
 
-	if (!interactive.length) return;
+  if (!interactive.length) return;
 
-	return interactive as Interactive[];
+  return interactive;
 }
 
 export async function saveWhatsAppMessageAsGenericMessage({
-	data,
-	contact_uid,
-	external_message_id,
-	account_channel_uid,
-	active_message_type,
-	direction,
+  data,
+  contact_uid,
+  external_message_id,
+  account_channel_uid,
+  active_message_type,
+  direction,
 }: {
-	data: WebhookMessage | Message;
-	contact_uid: string;
-	external_message_id: string;
-	account_channel_uid: string;
-	active_message_type?:
-		| 'QUIZ'
-		| 'INTERACTION'
-		| 'ASK_FOR_TRANSLATION'
-		| 'OPEN_WINDOW';
-	direction: 'IN' | 'OUT' | 'SYSTEM';
+  data: WebhookMessage | Message;
+  contact_uid: string;
+  external_message_id: string;
+  account_channel_uid: string;
+  active_message_type?:
+    | "QUIZ"
+    | "INTERACTION"
+    | "ASK_FOR_TRANSLATION"
+    | "OPEN_WINDOW";
+  direction: "IN" | "OUT" | "SYSTEM";
 }) {
-	console.log('external_message_id', external_message_id);
-	// Save the message to the database
-	const message: MessageDTO = {
-		uid: external_message_id,
-		account_channel_uid,
-		type: data.type,
-		active_message_type,
-		direction,
-		contact: {
-			uid: contact_uid,
-		},
-		context: await getContext(data),
-		components: await getComponents(data),
-		interactive: await getInteractive(data),
-	};
+  console.log("external_message_id", external_message_id);
 
-	await MessagesCollection.insertAsync(message);
+  const context = await getContext(data);
+  const components = await getComponents(data);
+  const interactive = await getInteractive(data);
+
+  const message: NewMessage = {
+    uid: external_message_id,
+    accountChannelUid: account_channel_uid,
+    type: data.type,
+    activeMessageType: active_message_type,
+    direction,
+    contactUid: contact_uid,
+    context: context,
+    components: components,
+    interactive: interactive,
+  };
+
+  await createMessage(message);
 }
-
-Meteor.methods({
-	'words.saveWhatsAppMessage': saveWhatsAppMessageAsGenericMessage,
-});

@@ -1,11 +1,11 @@
-import React, { useState } from "react";
-import { useParams } from "react-router-dom";
+import { useState } from "react";
+import { useParams } from "@tanstack/react-router";
 import YouTube from "react-youtube";
 
-import { useFind, useSubscribe } from "meteor/react-meteor-data";
+import { useQuery } from "@tanstack/react-query";
 
-import { CaptionsCollection } from "/imports/api/captions/collections";
-import { VideosCollection } from "/imports/api/videos/collections";
+import { getVideoById } from "~/utils/videos";
+import { getCaptionsByVideoId } from "~/utils/captions";
 
 import { LoaderSpinner } from "~/components/ui/loader";
 
@@ -14,8 +14,7 @@ import { VideoControls } from "./VideoControls";
 import { VideoPlayer } from "./VideoPlayer";
 
 export const VideoPage: React.FC = () => {
-  const { videoId } = useParams();
-  console.log("videoId", videoId);
+  const { videoId } = useParams({ strict: false });
 
   const [player, setPlayer] = useState<any>(null);
   const [videoState, setVideoState] = useState(-1);
@@ -23,17 +22,17 @@ export const VideoPage: React.FC = () => {
   const [currentCaptionIndex, setCurrentCaptionIndex] = useState(-1);
   const [isVideoEnded, setIsVideoEnded] = useState(false);
 
-  const isLoadingVideo = useSubscribe("videos.findById", videoId);
-  const [video] = useFind(
-    () => VideosCollection.find({ _id: videoId }),
-    [videoId],
-  );
+  const { data: video, isLoading: isLoadingVideo } = useQuery({
+    queryKey: ["video", videoId],
+    queryFn: () => getVideoById({ data: videoId! }),
+    enabled: !!videoId,
+  });
 
-  const isLoadingCaptions = useSubscribe("youtube.captions", videoId);
-  const captions = useFind(
-    () => CaptionsCollection.find({ videoId: videoId }, { sort: { start: 1 } }),
-    [videoId],
-  );
+  const { data: captions = [], isLoading: isLoadingCaptions } = useQuery({
+    queryKey: ["captions", videoId],
+    queryFn: () => getCaptionsByVideoId({ data: videoId! }),
+    enabled: !!videoId,
+  });
 
   const playVideoAt = (time: number) => {
     if (player) {
@@ -83,9 +82,11 @@ export const VideoPage: React.FC = () => {
     console.log("isVideoEnded", isVideoEnded);
   };
 
+  const isLoading = isLoadingVideo || isLoadingCaptions;
+
   return (
-    <div className="flex flex-col flex-grow h-full">
-      {isLoadingVideo() || isLoadingCaptions() ? (
+    <div className="flex flex-col grow h-full">
+      {isLoading ? (
         <div className="flex justify-center items-center h-full w-full">
           <LoaderSpinner />
         </div>

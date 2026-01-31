@@ -1,9 +1,9 @@
-import React, { useEffect } from "react";
-import { useNavigate } from "react-router-dom";
+import { useEffect, useState } from "react";
+import { useNavigate } from "@tanstack/react-router";
 
-import { useFind, useSubscribe } from "meteor/react-meteor-data";
+import { useQuery } from "@tanstack/react-query";
 
-import { Video, VideosCollection } from "/imports/api/videos/collections";
+import { getVideos } from "~/utils/videos";
 
 import { Button } from "~/components/ui/button";
 import { Input } from "~/components/ui/input";
@@ -12,19 +12,14 @@ import { LoaderSpinner } from "~/components/ui/loader";
 import { VideoCard } from "./Videos/VideoCard";
 
 export const VideosHome = () => {
-  const [search, setSearch] = React.useState("");
-  const [searchQuery, setSearchQuery] = React.useState("");
+  const [search, setSearch] = useState("");
+  const [searchQuery, setSearchQuery] = useState("");
   const navigate = useNavigate();
 
-  const isLoading = useSubscribe("videos.list", searchQuery);
-  console.log("search", search);
-  const videos: Video[] = useFind(
-    () =>
-      VideosCollection.find(
-        searchQuery ? { name: { $regex: searchQuery, $options: "i" } } : {},
-      ),
-    [],
-  );
+  const { data: videos = [], isLoading } = useQuery({
+    queryKey: ["videos", searchQuery],
+    queryFn: () => getVideos({ data: searchQuery || undefined }),
+  });
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -42,10 +37,10 @@ export const VideosHome = () => {
   }, [search]);
 
   const searchVideosOnYoutube = () => {
-    navigate(`/videos?search=${searchQuery}`);
+    navigate({ to: "/youtube", search: { search: searchQuery } });
   };
 
-  if (isLoading()) {
+  if (isLoading) {
     return (
       <div className="flex justify-center items-center h-full w-full">
         <LoaderSpinner />
@@ -69,8 +64,8 @@ export const VideosHome = () => {
         />
         <Button type="submit">Search Videos</Button>
       </form>
-      {videos.map((video: Video) => (
-        <VideoCard key={video._id} video={video} />
+      {videos.map((video) => (
+        <VideoCard key={video.id} video={video} />
       ))}
       {search && (
         <div className="flex w-full justify-center gap-x-2 lg:col-span-2">

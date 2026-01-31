@@ -1,13 +1,20 @@
-import React, { useEffect } from "react";
-
-import { Meteor } from "meteor/meteor";
-
-import { UserLearningWord } from "/imports/api/user-learning/words/collections";
+import { useEffect } from "react";
 
 import { toast } from "sonner";
 
+import { updateDifficulty } from "~/utils/user-learning-words";
+
 import { cn } from "~/lib/utils";
 import { Button } from "~/components/ui/button";
+
+type UserLearningWord = {
+  id: string;
+  wordId: string;
+  userId: string;
+  difficultyRate: Array<{ rate: string; reviewedAt: string }> | null;
+  nextReviewAt: Date;
+  createdAt: Date;
+};
 
 export const ReviewWordDifficulty = ({
   learningWord,
@@ -18,30 +25,31 @@ export const ReviewWordDifficulty = ({
   className?: string;
   setCompleted?: () => void;
 }) => {
-  const handleDifficulty = (learningWordId?: string, difficulty?: string) => {
+  const handleDifficulty = async (
+    learningWordId?: string,
+    difficulty?: string,
+  ) => {
     if (!learningWordId || !difficulty) return;
-    Meteor.call(
-      "user-learning.words.updateDifficulty",
-      { learningWordId, difficulty },
-      (error: Error) => {
-        if (error) {
-          toast("Error", {
-            description: error.message,
-            duration: 4000,
-          });
-          return;
-        }
 
-        toast("Success", {
-          description: "Difficulty updated",
-          duration: 2000,
-        });
+    try {
+      await updateDifficulty({
+        data: { learningWordId, difficulty },
+      });
 
-        if (setCompleted) {
-          setCompleted();
-        }
-      },
-    );
+      toast("Success", {
+        description: "Difficulty updated",
+        duration: 2000,
+      });
+
+      if (setCompleted) {
+        setCompleted();
+      }
+    } catch (error) {
+      toast("Error", {
+        description: error instanceof Error ? error.message : "Unknown error",
+        duration: 4000,
+      });
+    }
   };
 
   useEffect(() => {
@@ -49,7 +57,7 @@ export const ReviewWordDifficulty = ({
       const key = event.key;
       if (["1", "2", "4", "5"].includes(key)) {
         event.preventDefault();
-        handleDifficulty(learningWord._id, key);
+        handleDifficulty(learningWord.id, key);
       }
     };
 
@@ -58,20 +66,18 @@ export const ReviewWordDifficulty = ({
     return () => {
       window.removeEventListener("keydown", handleKeyPress);
     };
-  }, [learningWord?._id]);
+  }, [learningWord?.id]);
 
   return (
     <div className={cn("flex gap-x-2", className)}>
-      <Button onClick={() => handleDifficulty(learningWord._id, "1")}>
+      <Button onClick={() => handleDifficulty(learningWord.id, "1")}>
         Easy
       </Button>
-      <Button onClick={() => handleDifficulty(learningWord._id, "2")}>
-        Ok
-      </Button>
-      <Button onClick={() => handleDifficulty(learningWord._id, "4")}>
+      <Button onClick={() => handleDifficulty(learningWord.id, "2")}>Ok</Button>
+      <Button onClick={() => handleDifficulty(learningWord.id, "4")}>
         Hard
       </Button>
-      <Button onClick={() => handleDifficulty(learningWord._id, "5")}>
+      <Button onClick={() => handleDifficulty(learningWord.id, "5")}>
         I don't know
       </Button>
     </div>

@@ -1,39 +1,29 @@
-import React from "react";
+import { useQuery } from "@tanstack/react-query";
 
-import { useFind, useSubscribe } from "meteor/react-meteor-data";
+import { getUserLearningWords } from "~/utils/user-learning-words";
 
-import { UserLearningWordsCollection } from "/imports/api/user-learning/words/collections";
-
-import { columns } from "~/components/Words/LearningWordsTable/Columns";
-import { DataTable } from "~/components/Words/LearningWordsTable/DataTable";
 import { Card, CardContent, CardHeader, CardTitle } from "~/components/ui/card";
 import { LoaderSpinner } from "~/components/ui/loader";
+import { columns } from "~/components/fragments/Words/LearningWordsTable/Columns";
+import { DataTable } from "~/components/fragments/Words/LearningWordsTable/DataTable";
 
 export const ReviewWords = () => {
-  const isLoading = useSubscribe("user-learning.words.with-dictionary");
+  const { data: userLearningWords, isLoading } = useQuery({
+    queryKey: ["user-learning-words"],
+    queryFn: () => getUserLearningWords(),
+  });
 
-  const userLearningWords = useFind(() =>
-    UserLearningWordsCollection.find(
-      {},
-      {
-        sort: {
-          nextReviewAt: 1 as const,
-        },
-      },
-    ),
-  );
-  console.log("userLearningWords", userLearningWords, isLoading());
   return (
     <Card>
       <CardHeader>
         <CardTitle>Review Words</CardTitle>
       </CardHeader>
       <CardContent>
-        {isLoading() ? (
+        {isLoading ? (
           <div className="flex justify-center items-center h-full w-full">
             <LoaderSpinner />
           </div>
-        ) : userLearningWords.length === 0 ? (
+        ) : !userLearningWords || userLearningWords.length === 0 ? (
           <>No words to review</>
         ) : (
           <>

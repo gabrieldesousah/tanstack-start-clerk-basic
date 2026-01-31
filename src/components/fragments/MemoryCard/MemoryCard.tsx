@@ -1,13 +1,20 @@
-import React, { useEffect, useState } from "react";
+import { useEffect, useState } from "react";
 
-import { Meteor } from "meteor/meteor";
-
-import { UserLearningWord } from "/imports/api/user-learning/words/collections";
-import { Dictionary } from "/imports/api/words/collections";
-
-import { ReviewWordDifficulty } from "/imports/ui/Pages/ReviewWordDifficulty";
+import { ReviewWordDifficulty } from "~/components/pages/ReviewWordDifficulty";
+import { getWordById } from "~/utils/words";
 
 import { FlipCardComponent } from "./FlipCardComponent";
+
+type Word = Awaited<ReturnType<typeof getWordById>>;
+
+type UserLearningWord = {
+  id: string;
+  wordId: string;
+  userId: string;
+  difficultyRate: unknown;
+  nextReviewAt: Date;
+  createdAt: Date;
+};
 
 export const MemoryCard = ({
   learningWord,
@@ -16,22 +23,23 @@ export const MemoryCard = ({
   learningWord: UserLearningWord;
   setCompleted?: () => void;
 }) => {
-  const [dictionaryWord, setDictionaryWord] = useState<Dictionary>();
+  const [dictionaryWord, setDictionaryWord] = useState<Word>();
+
   useEffect(() => {
-    Meteor.call(
-      "words.find",
-      learningWord.wordId,
-      (error: Error, result: Dictionary) => {
-        if (error) {
-          console.error(error);
-          return;
-        }
+    const fetchWord = async () => {
+      try {
+        const result = await getWordById({ data: learningWord.wordId });
         setDictionaryWord(result);
-      },
-    );
+      } catch (error) {
+        console.error(error);
+      }
+    };
+
+    if (learningWord?.wordId) {
+      fetchWord();
+    }
   }, [learningWord?.wordId]);
 
-  console.log("learningWord", learningWord);
   return (
     <div className="mx-auto flex flex-col p-5 gap-4 justify-center items-center">
       <FlipCardComponent dictionaryWord={dictionaryWord} />

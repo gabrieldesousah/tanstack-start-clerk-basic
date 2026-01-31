@@ -12,7 +12,12 @@ import { Route as rootRouteImport } from './routes/__root'
 import { Route as AuthedRouteImport } from './routes/_authed'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as DemoDrizzleRouteImport } from './routes/demo/drizzle'
+import { Route as AuthedYoutubeRouteImport } from './routes/_authed/youtube'
+import { Route as AuthedReviewRouteImport } from './routes/_authed/review'
 import { Route as AuthedPostsRouteImport } from './routes/_authed/posts'
+import { Route as AuthedLearningPathRouteImport } from './routes/_authed/learning-path'
+import { Route as AuthedHomeRouteImport } from './routes/_authed/home'
+import { Route as AuthedExploreRouteImport } from './routes/_authed/explore'
 import { Route as AuthedPostsIndexRouteImport } from './routes/_authed/posts.index'
 import { Route as AuthedProfileSplatRouteImport } from './routes/_authed/profile.$'
 import { Route as AuthedPostsPostIdRouteImport } from './routes/_authed/posts.$postId'
@@ -31,9 +36,34 @@ const DemoDrizzleRoute = DemoDrizzleRouteImport.update({
   path: '/demo/drizzle',
   getParentRoute: () => rootRouteImport,
 } as any)
+const AuthedYoutubeRoute = AuthedYoutubeRouteImport.update({
+  id: '/youtube',
+  path: '/youtube',
+  getParentRoute: () => AuthedRoute,
+} as any)
+const AuthedReviewRoute = AuthedReviewRouteImport.update({
+  id: '/review',
+  path: '/review',
+  getParentRoute: () => AuthedRoute,
+} as any)
 const AuthedPostsRoute = AuthedPostsRouteImport.update({
   id: '/posts',
   path: '/posts',
+  getParentRoute: () => AuthedRoute,
+} as any)
+const AuthedLearningPathRoute = AuthedLearningPathRouteImport.update({
+  id: '/learning-path',
+  path: '/learning-path',
+  getParentRoute: () => AuthedRoute,
+} as any)
+const AuthedHomeRoute = AuthedHomeRouteImport.update({
+  id: '/home',
+  path: '/home',
+  getParentRoute: () => AuthedRoute,
+} as any)
+const AuthedExploreRoute = AuthedExploreRouteImport.update({
+  id: '/explore',
+  path: '/explore',
   getParentRoute: () => AuthedRoute,
 } as any)
 const AuthedPostsIndexRoute = AuthedPostsIndexRouteImport.update({
@@ -54,7 +84,12 @@ const AuthedPostsPostIdRoute = AuthedPostsPostIdRouteImport.update({
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
+  '/explore': typeof AuthedExploreRoute
+  '/home': typeof AuthedHomeRoute
+  '/learning-path': typeof AuthedLearningPathRoute
   '/posts': typeof AuthedPostsRouteWithChildren
+  '/review': typeof AuthedReviewRoute
+  '/youtube': typeof AuthedYoutubeRoute
   '/demo/drizzle': typeof DemoDrizzleRoute
   '/posts/$postId': typeof AuthedPostsPostIdRoute
   '/profile/$': typeof AuthedProfileSplatRoute
@@ -62,6 +97,11 @@ export interface FileRoutesByFullPath {
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
+  '/explore': typeof AuthedExploreRoute
+  '/home': typeof AuthedHomeRoute
+  '/learning-path': typeof AuthedLearningPathRoute
+  '/review': typeof AuthedReviewRoute
+  '/youtube': typeof AuthedYoutubeRoute
   '/demo/drizzle': typeof DemoDrizzleRoute
   '/posts/$postId': typeof AuthedPostsPostIdRoute
   '/profile/$': typeof AuthedProfileSplatRoute
@@ -71,7 +111,12 @@ export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
   '/_authed': typeof AuthedRouteWithChildren
+  '/_authed/explore': typeof AuthedExploreRoute
+  '/_authed/home': typeof AuthedHomeRoute
+  '/_authed/learning-path': typeof AuthedLearningPathRoute
   '/_authed/posts': typeof AuthedPostsRouteWithChildren
+  '/_authed/review': typeof AuthedReviewRoute
+  '/_authed/youtube': typeof AuthedYoutubeRoute
   '/demo/drizzle': typeof DemoDrizzleRoute
   '/_authed/posts/$postId': typeof AuthedPostsPostIdRoute
   '/_authed/profile/$': typeof AuthedProfileSplatRoute
@@ -81,18 +126,38 @@ export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
   fullPaths:
     | '/'
+    | '/explore'
+    | '/home'
+    | '/learning-path'
     | '/posts'
+    | '/review'
+    | '/youtube'
     | '/demo/drizzle'
     | '/posts/$postId'
     | '/profile/$'
     | '/posts/'
   fileRoutesByTo: FileRoutesByTo
-  to: '/' | '/demo/drizzle' | '/posts/$postId' | '/profile/$' | '/posts'
+  to:
+    | '/'
+    | '/explore'
+    | '/home'
+    | '/learning-path'
+    | '/review'
+    | '/youtube'
+    | '/demo/drizzle'
+    | '/posts/$postId'
+    | '/profile/$'
+    | '/posts'
   id:
     | '__root__'
     | '/'
     | '/_authed'
+    | '/_authed/explore'
+    | '/_authed/home'
+    | '/_authed/learning-path'
     | '/_authed/posts'
+    | '/_authed/review'
+    | '/_authed/youtube'
     | '/demo/drizzle'
     | '/_authed/posts/$postId'
     | '/_authed/profile/$'
@@ -128,11 +193,46 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof DemoDrizzleRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/_authed/youtube': {
+      id: '/_authed/youtube'
+      path: '/youtube'
+      fullPath: '/youtube'
+      preLoaderRoute: typeof AuthedYoutubeRouteImport
+      parentRoute: typeof AuthedRoute
+    }
+    '/_authed/review': {
+      id: '/_authed/review'
+      path: '/review'
+      fullPath: '/review'
+      preLoaderRoute: typeof AuthedReviewRouteImport
+      parentRoute: typeof AuthedRoute
+    }
     '/_authed/posts': {
       id: '/_authed/posts'
       path: '/posts'
       fullPath: '/posts'
       preLoaderRoute: typeof AuthedPostsRouteImport
+      parentRoute: typeof AuthedRoute
+    }
+    '/_authed/learning-path': {
+      id: '/_authed/learning-path'
+      path: '/learning-path'
+      fullPath: '/learning-path'
+      preLoaderRoute: typeof AuthedLearningPathRouteImport
+      parentRoute: typeof AuthedRoute
+    }
+    '/_authed/home': {
+      id: '/_authed/home'
+      path: '/home'
+      fullPath: '/home'
+      preLoaderRoute: typeof AuthedHomeRouteImport
+      parentRoute: typeof AuthedRoute
+    }
+    '/_authed/explore': {
+      id: '/_authed/explore'
+      path: '/explore'
+      fullPath: '/explore'
+      preLoaderRoute: typeof AuthedExploreRouteImport
       parentRoute: typeof AuthedRoute
     }
     '/_authed/posts/': {
@@ -174,12 +274,22 @@ const AuthedPostsRouteWithChildren = AuthedPostsRoute._addFileChildren(
 )
 
 interface AuthedRouteChildren {
+  AuthedExploreRoute: typeof AuthedExploreRoute
+  AuthedHomeRoute: typeof AuthedHomeRoute
+  AuthedLearningPathRoute: typeof AuthedLearningPathRoute
   AuthedPostsRoute: typeof AuthedPostsRouteWithChildren
+  AuthedReviewRoute: typeof AuthedReviewRoute
+  AuthedYoutubeRoute: typeof AuthedYoutubeRoute
   AuthedProfileSplatRoute: typeof AuthedProfileSplatRoute
 }
 
 const AuthedRouteChildren: AuthedRouteChildren = {
+  AuthedExploreRoute: AuthedExploreRoute,
+  AuthedHomeRoute: AuthedHomeRoute,
+  AuthedLearningPathRoute: AuthedLearningPathRoute,
   AuthedPostsRoute: AuthedPostsRouteWithChildren,
+  AuthedReviewRoute: AuthedReviewRoute,
+  AuthedYoutubeRoute: AuthedYoutubeRoute,
   AuthedProfileSplatRoute: AuthedProfileSplatRoute,
 }
 
